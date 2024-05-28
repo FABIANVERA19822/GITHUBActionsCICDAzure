@@ -1,196 +1,93 @@
-name: Automatic Releases workflow sample
-on:  
-  # workflow_dispatch:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  
+name: ghactions-build-imagetag-app
+run-name: Deploy App .net8 Hello World 🚀 ${{ inputs.Environment }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      Environment:
+        type: choice
+        description: 'Environment'
+        required: true
+        options: 
+            - dev
+            - stg
+            - uat
+            - prod
+
+permissions:
+  id-token: write
+  contents: write 
+env:
+  ACRREPOSITORY: ${{ secrets.ECRREPOSITORY_PROPERTYSVC }}  # acr-jmf-set-helloapp
+  ACRREGISTRY: ${{ secrets.ECRREGISTRY }}  # "153169536464.dkr.ecr.us-east-1.amazonaws.com"
+  DOCKER_BUILDKIT: ${{ secrets.DOCKER_BUILDKIT }} #1
+  AZURE_REGION: ${{ secrets.AWS_REGION }} # "us-east-1"
+  ENVSHORTNAME: ${{ secrets.ENV_SHORT_NAME }} # dev,qa,main
+  ENVFULLNAME: ${{ secrets.ENV_FULL_NAME }} #development, quality
+  NAMESPACE: ${{ secrets.NAMESPACE }} # ns-totira-dev, ns-totira-qa
+
 jobs:
-  test:
-    name: "Building App Hello World"
-    runs-on: ubuntu-latest
+  Workflow_Deployment_LogicApp:
+    if: ${{ github.base_ref }} == 'refs/heads/main'
+    runs-on: internal
+    environment: ${{ inputs.Environment }}
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
-      - name: Install dependencies
-        run: dotnet restore
-        working-directory: src
-      - name: Build
-        run: dotnet build
-        working-directory: src
-      - name: Test with the dotnet CLI
-        run: dotnet test
-        working-directory: src
+     - name: Checkout code
+       uses: actions/checkout@v2
 
-  create-release:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    name: "Create release"
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    needs: test
-    outputs:
-      tag: ${{ steps.changelog.outputs.tag }}
-      changelog: ${{ steps.changelog.outputs.changelog }}
-    steps:  
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Conventional Changelog Action
-        id: changelog 
-        uses: TriPSs/conventional-changelog-action@v3 
-        with: 
-          github-token: ${{ secrets.github_token }}
-          output-file: 'CHANGELOG.md' 
-          skip-commit: 'true'
-          # version-file: '../packages/package.json'
-          skip-tag: 'false'
-      - name: Create Release
-        uses: actions/create-release@v1
-        if: ${{ steps.changelog.outputs.skipped == 'false' && github.ref == 'refs/heads/main'}} 
-        env: 
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with: 
-          tag_name: ${{ steps.changelog.outputs.tag }} 
-          release_name: ${{ steps.changelog.outputs.tag }} 
-          body: ${{ steps.changelog.outputs.clean_changelog }}
-      
-  publish-package-ghcr:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    needs: create-release
-    permissions:
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ghcr.io/primo391981/${{ vars.DEPARTMENT }}/${{ vars.APPLICATION_NAME }}
-          tags: |
-            type=semver,pattern={{raw}},value=${{ needs.create-release.outputs.tag }}
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{major}}.{{minor}}
-          # tags: type=sha
-      - name: Login to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build container
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-        
-  publish-package-acr:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    needs: create-release
-    steps:
-    - name: 'Checkout Github Action'
-      uses: actions/checkout@v3
-    - name: 'Login via Azure CLI'
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-    - uses: azure/docker-login@v1
-      with:
-        login-server: ${{ vars.ACR_SERVER }}
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
-    - name: Docker meta
-      id: meta
-      uses: docker/metadata-action@v4
-      with:
-        images: ${{ vars.ACR_SERVER }}/${{ vars.DEPARTMENT }}/${{ vars.APPLICATION_NAME }}
-        tags: |
-          # type=semver,pattern={{raw}},value=${{ needs.create-release.outputs.tag }}
-          # type=ref,event=branch
-          # type=ref,event=pr
-          type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.create-release.outputs.tag }}
-        # tags: type=sha
-    - name: Build container
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-    # - name: 'Build Push to ACR'
-    #   run: |
-    #     docker build . -t ${{ vars.ACR_SERVER }}/${{ vars.DEPARTMENT }}/${{ vars.APPLICATION_NAME }}:${{ needs.create-release.outputs.tag }}
-    #     docker push ${{ vars.ACR_SERVER }}/${{ vars.DEPARTMENT }}/${{ vars.APPLICATION_NAME }}:${{ needs.create-release.outputs.tag }} 
 
-    # - uses: azure/webapps-deploy@v2
-    #   with:
-    #     app-name: 'poc-auto-package'
-    #     images: '${{ vars.ACR_SERVER }}/${{ vars.DEPARTMENT }}/${{ vars.APPLICATION_NAME }}:${{ needs.create-release.outputs.tag }}'
+     - name: Az CLI login
+       uses: azure/login@v1
+       with:
+         client-id: ${{ vars.AZURE_CLIENT_ID }}
+         tenant-id: ${{ vars.AZURE_TENANT_ID }}
+         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+         enable-AzPSSession: true
 
-    # - name: Create URL to the run output
-    #   id: vars
-    #   run: echo "run-url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
+     - name: Generate SemVer
+       id: semver
+       run: |
+         echo "::set-output name=SEMVER::1.0"
+     - name: Generate build ID
+       id: prep
+       run: |
+          sha=${GITHUB_SHA::8}
+          ts=$(date +%s%3N)
+          echo "::set-output name=BUILD_ID::set-${{ secrets.ENV_SHORT_NAME }}-helloapp-${{ steps.semver.outputs.SEMVER }}.${ts}"
 
-  create-comment:
-    runs-on: ubuntu-latest
-    needs: [publish-package-acr,create-release]
-    permissions:
-      issues: write
-      pull-requests: write
-      contents: read
-    steps:  
-      - uses: actions/checkout@v3
-      - name: 'Create issue'
-        id: create-issue
-        uses: JasonEtco/create-an-issue@v2
+     - name: Build and tag Docker image
+       run: docker build -f services/Totira.Services.PropertiesService/src/Totira.Services.PropertiesService/Dockerfile --tag ${{ env.ECRREGISTRY }}/${{ env.ECRREPOSITORY }}:${{ env.BUILD_ID }} .
+       working-directory: /src/
+       env:
+        BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
+        ECRREGISTRY: ${{ env.ECRREGISTRY }}
+        ECRREPOSITORY: ${{ env.ECRREPOSITORY }}
+
+     - name: Get ECR credentials from Kubernetes secret
+       run: |
+         username=$(kubectl get secret ecr-credentials -n ${{ secrets.NAMESPACE }} -o=jsonpath='{.data.docker-username}' | base64 -d)
+         password=$(kubectl get secret ecr-credentials -n ${{ secrets.NAMESPACE }} -o=jsonpath='{.data.docker-password}' | base64 -d)
+         echo "::set-output name=USERNAME::$username"
+         echo "::set-output name=PASSWORD::$password"
+         id: get-credentials
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registry: ${{ env.ECRREGISTRY }}
+          region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.ECR_AWS_SESSION_TOKEN }}
+          username: ${{ steps.get-credentials.outputs.USERNAME }}
+          password: ${{ steps.get-credentials.outputs.PASSWORD }}
+
+      - name: Push Docker image to Amazon ECR
+        run: |
+          docker push ${{ env.ECRREGISTRY }}/${{ env.ECRREPOSITORY }}:${{ env.BUILD_ID }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.create-release.outputs.tag }} 
-      - name: Create comment
-        uses: peter-evans/create-or-update-comment@v3
-        with:
-          issue-number: ${{ steps.create-issue.outputs.number }} 
-          body: |
-            New container created and published!
-            ## New tag: ${{ needs.create-release.outputs.tag }}
-            ${{ needs.create-release.outputs.changelog }} 
-          reactions: rocket
-
-  # deploy-to-infra:
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #   runs-on: ubuntu-latest
-  #   needs: [publish-package-acr,create-release]
-  #   steps:
-  #   # checkout the repo
-  #   - name: 'Checkout Github Action'
-  #     uses: actions/checkout@v3
-
-  #   - name: 'Login via Azure CLI'
-  #     uses: azure/login@v1
-  #     with:
-  #       creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-  #   - uses: azure/docker-login@v1
-  #     with:
-  #       login-server: ${{ vars.ACR_NAME }}
-  #       username: ${{ secrets.ACR_USERNAME }}
-  #       password: ${{ secrets.ACR_PASSWORD }}
-
-  #   - name: 'Deploy to Azure'
-  #     # env:
-  #     #   SECRET: ${{ secrets.PGP_SECRET_SIGNING_PASSPHRASE }}
-  #     run: |
-  #       container_name=${{ vars.ACR_SERVER }}/${{ vars.DEPARTMENT }}/${{ vars.APPLICATION_NAME }}:${{ needs.create-release.outputs.tag }}
-  #       az deployment group create --resource-group RG-JMF-POC --template-file appservice.bicep --parameters appName=poc-auto-package acrName=${{ vars.ACR_NAME }} containerImage=$container_name
-  #     working-directory: infrastructure
+          ECRREGISTRY: ${{ env.ECRREGISTRY }}
+          ECRREPOSITORY: ${{ env.ECRREPOSITORY }}
+          BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
