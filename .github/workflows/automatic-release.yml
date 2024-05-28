@@ -72,22 +72,22 @@ jobs:
          echo "::set-output name=PASSWORD::$password"
          id: get-credentials
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          registry: ${{ env.ECRREGISTRY }}
-          region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.ECR_AWS_SESSION_TOKEN }}
-          username: ${{ steps.get-credentials.outputs.USERNAME }}
-          password: ${{ steps.get-credentials.outputs.PASSWORD }}
+     - name: Login to Amazon ECR
+       id: login-ecr
+       uses: aws-actions/amazon-ecr-login@v1
+       with:
+         registry: ${{ env.ECRREGISTRY }}
+         region: ${{ env.AWS_REGION }}
+         aws-access-key-id: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
+         aws-secret-access-key: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
+         aws-session-token: ${{ secrets.ECR_AWS_SESSION_TOKEN }}
+         username: ${{ steps.get-credentials.outputs.USERNAME }}
+         password: ${{ steps.get-credentials.outputs.PASSWORD }}
 
-      - name: Push Docker image to Amazon ECR
-        run: |
-          docker push ${{ env.ECRREGISTRY }}/${{ env.ECRREPOSITORY }}:${{ env.BUILD_ID }}
-        env:
-          ECRREGISTRY: ${{ env.ECRREGISTRY }}
-          ECRREPOSITORY: ${{ env.ECRREPOSITORY }}
-          BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
+     - name: Push Docker image to Amazon ECR
+       run: |
+         docker push ${{ env.ECRREGISTRY }}/${{ env.ECRREPOSITORY }}:${{ env.BUILD_ID }}
+       env:
+         ECRREGISTRY: ${{ env.ECRREGISTRY }}
+         ECRREPOSITORY: ${{ env.ECRREPOSITORY }}
+         BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
