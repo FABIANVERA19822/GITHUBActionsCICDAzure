@@ -18,7 +18,7 @@ permissions:
   id-token: write
   contents: write 
 env:
-  ACRREPOSITORY: ${{ secrets.ACRREPOSITORY}}
+  ACRREPOSITORY: ${{ secrets.ACRREPOSITORY }}
   ACRREGISTRY: ${{ secrets.ACRREGISTRY }}  # "153169536464.dkr.ecr.us-east-1.amazonaws.com"
   DOCKER_BUILDKIT: ${{ secrets.DOCKER_BUILDKIT }} #1
   AZURE_REGION: ${{ secrets.AZURE_REGION }} # "us-east-1"
