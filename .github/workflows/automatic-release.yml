@@ -13,10 +13,13 @@ on:
             - stg
             - uat
             - prod
+      AppId:
+        type: choice
+        description: 'ApplicationId'
+        required: true
+        options: 
+            - a
 
-permissions:
-  id-token: write
-  contents: write 
 env:
   ACRREPOSITORY: ${{ secrets.ACRREPOSITORY }}
   ACRREGISTRY: ${{ secrets.ACRREGISTRY }}  # "153169536464.dkr.ecr.us-east-1.amazonaws.com"
@@ -27,42 +30,77 @@ env:
   NAMESPACE: ${{ secrets.NAMESPACE }}
 
 jobs:
-  Workflow_Deployment_LogicApp:
+  Continous-integration-App:
+    permissions:
+      id-token: write
+      contents: write 
     if: ${{ github.base_ref }} == 'refs/heads/main'
     runs-on: internal
     environment: ${{ inputs.Environment }}
 
     steps:
      - name: Checkout code
-       uses: actions/checkout@v2
+       uses: actions/checkout@v4
 
+     - name: Set the repo varables
+       id: set_repo_varables
+       run: |
+             cat env/.env >>${GITHUB_ENV}
 
      - name: Az CLI login
        uses: azure/login@v1
        with:
-         client-id: ${{ vars.AZURE_CLIENT_ID }}
-         tenant-id: ${{ vars.AZURE_TENANT_ID }}
-         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-         enable-AzPSSession: true
+         client-id: ${{ secrets.AZURE_CLIENT_ID }}
+         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-     - name: Generate SemVer
+     - name: Setup .NET Core SDK
+       uses: actions/setup-dotnet@v1
+       with:
+         dotnet-version: '8.0.x'  # Adjust the .NET Core version according to your needs
+ 
+     - name: Restore NuGet packages
+       run: dotnet restore
+ 
+     - name: Build
+       run: dotnet build --configuration Release --no-restore
+ 
+     - name: Run Tests
+       run: dotnet test --no-build --verbosity normal  # Runs the tests of the .NET Cor project
+ 
+     - name: Generate SemVer                       # Generation of Semantic Version
        id: semver
        run: |
-         echo "::set-output name=SEMVER::1.0"
-     - name: Generate build ID
+         echo "::set-output name=SEMVER::1.0"      
+     
+     - name: Generate build ID                     # Generation of Build ID
        id: prep
        run: |
           sha=${GITHUB_SHA::8}
           ts=$(date +%s%3N)
-          echo "::set-output name=BUILD_ID::set-${{ env.ENVSHORTNAME }}-helloapp-${{ steps.semver.outputs.SEMVER }}.${ts}"
+          echo "::set-output name=BUILD_ID::set-dev-helloapp-${{ steps.semver.outputs.SEMVER }}.${ts}"
 
      - name: Build and tag Docker image
-       run: docker build -f Dockerfile --tag ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }} .
+       run: docker build -f Dockerfile --tag ${{ vars.REGISTRY_NAME }}.azureecr.io/${{env.BU}}-${{env.APPLICATION_NAME}}/${{env.APPLICATION_ROLE}}:${{ env.BUILD_ID }} .
        working-directory: /src/
        env:
         BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
-        ECRREGISTRY: ${{ env.ACRREGISTRY }}
-        ECRREPOSITORY: ${{ env.ACRREPOSITORY }}
+
+     - name: Install Trivy
+       run: |
+         wget https://github.com/aquasecurity/trivy/releases/download/v0.20.0/trivy_0.20.0_Linux-64bit.deb
+         sudo dpkg -i trivy_0.20.0_Linux-64bit.deb
+  
+     - name: Install Anchore Engine
+       run: |
+         curl -s https://packagecloud.io/install/repositories/anchore/anchore-engine/script.deb.sh | sudo bash
+         sudo apt-get install -y anchore-engine-cli
+
+     - name: Scan Docker image with Trivy
+       run: trivy --exit-code 1 --severity HIGH ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }}
+ 
+     - name: Scan Docker image with Anchore Engine
+       run: anchore-cli image add ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }} && anchore-cli image vuln ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }} os
 
      - name: Log in to Azure Container Registry
        env:
