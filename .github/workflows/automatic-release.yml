@@ -35,7 +35,7 @@ jobs:
       id-token: write
       contents: write 
     if: ${{ github.base_ref }} == 'refs/heads/main'
-    runs-on: internal
+    runs-on: ubuntu-latest
     environment: ${{ inputs.Environment }}
 
     steps:
