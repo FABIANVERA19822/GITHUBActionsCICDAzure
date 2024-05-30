@@ -35,7 +35,7 @@ jobs:
       id-token: write
       contents: write 
     if: ${{ github.base_ref }} == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: internal
     environment: ${{ inputs.Environment }}
 
     steps:
@@ -61,13 +61,16 @@ jobs:
  
      - name: Restore NuGet packages
        run: dotnet restore
- 
-     - name: Build
+       working-directory: src/ConsoleAppHelloWorld
+
+     - name: Build donet
        run: dotnet build --configuration Release --no-restore
- 
+       working-directory: src/ConsoleAppHelloWorld
+      
      - name: Run Tests
        run: dotnet test --no-build --verbosity normal  # Runs the tests of the .NET Cor project
- 
+       working-directory: src/ConsoleAppHelloWorld
+       
      - name: Generate SemVer                       # Generation of Semantic Version
        id: semver
        run: |
