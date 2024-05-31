@@ -20,22 +20,13 @@ on:
         options: 
             - a
 
-env:
-  ACRREPOSITORY: ${{ secrets.ACRREPOSITORY }}
-  ACRREGISTRY: ${{ secrets.ACRREGISTRY }}  # "153169536464.dkr.ecr.us-east-1.amazonaws.com"
-  DOCKER_BUILDKIT: ${{ secrets.DOCKER_BUILDKIT }} #1
-  AZURE_REGION: ${{ secrets.AZURE_REGION }} # "us-east-1"
-  ENVSHORTNAME: ${{ secrets.ENV_SHORT_NAME }} # dev,qa,main
-  ENVFULLNAME: ${{ secrets.ENV_FULL_NAME }} #development, quality
-  NAMESPACE: ${{ secrets.NAMESPACE }}
-
 jobs:
   Continous-integration-App:
     permissions:
       id-token: write
       contents: write 
     if: ${{ github.base_ref }} == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: internal
     environment: ${{ inputs.Environment }}
 
     steps:
@@ -46,14 +37,12 @@ jobs:
        id: set_repo_varables
        run: |
              cat env/.env >>${GITHUB_ENV}
-
-     - name: Login via Az module
+     - name: Az CLI login
        uses: azure/login@v1
        with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
+         client-id: ${{ secrets.AZURE_CLIENT_ID }}
+         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
      - name: Setup .NET Core SDK
        uses: actions/setup-dotnet@v1
@@ -82,40 +71,36 @@ jobs:
        run: |
           sha=${GITHUB_SHA::8}
           ts=$(date +%s%3N)
-          echo "::set-output name=BUILD_ID::set-dev-helloapp-${{ steps.semver.outputs.SEMVER }}.${ts}"
-
+          echo "::set-output name=BUILD_ID::${{ steps.semver.outputs.SEMVER }}.${ts}"
      - name: Build and tag Docker image
-       run: docker build -f Dockerfile --tag ${{ vars.REGISTRY_NAME }}.azureecr.io/${{env.BU}}-${{env.APPLICATION_NAME}}/${{env.APPLICATION_ROLE}}:${{ env.BUILD_ID }} .
-       working-directory: /src/
+       run: docker build -f Dockerfile --tag ${{ vars.REGISTRY_NAME }}.azurecr.io/${{env.BU}}-${{env.APPLICATION_NAME}}/${{env.APPLICATION_ROLE}}:${{ env.BUILD_ID }} .
        env:
         BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
 
-     - name: Install Trivy
-       run: |
-         wget https://github.com/aquasecurity/trivy/releases/download/v0.20.0/trivy_0.20.0_Linux-64bit.deb
-         sudo dpkg -i trivy_0.20.0_Linux-64bit.deb
-  
-     - name: Install Anchore Engine
-       run: |
-         curl -s https://packagecloud.io/install/repositories/anchore/anchore-engine/script.deb.sh | sudo bash
-         sudo apt-get install -y anchore-engine-cli
+     - name: Login to Docker Hub needed for cve scan
+       uses: docker/login-action@v3
+       with:
+         username: ${{ secrets.DOCKERHUB_USERNAME }}
+         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-     - name: Scan Docker image with Trivy
-       run: trivy --exit-code 1 --severity HIGH ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }}
- 
-     - name: Scan Docker image with Anchore Engine
-       run: anchore-cli image add ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }} && anchore-cli image vuln ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }} os
+     - name: Analyze for critical and high CVEs
+       id: docker-scout-cves
+       env:
+        BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
+       uses: docker/scout-action@v1
+       with:
+         command: cves
+         image: ${{ vars.REGISTRY_NAME }}.azurecr.io/${{ env.BU }}-${{ env.APPLICATION_NAME }}/${{ env.APPLICATION_ROLE }}:${{ env.BUILD_ID }}
+         only-severities: critical,high
+         exit-code: false
 
      - name: Log in to Azure Container Registry
        env:
-         AZURE_CONTAINER_REGISTRY: ${{ env.ACRREGISTRY }}
+         AZURE_CONTAINER_REGISTRY: ${{ vars.REGISTRY_NAME }}.azurecr.io
        run: |
          az acr login --name $AZURE_CONTAINER_REGISTRY
-
-     - name: Push Docker image to Azure ACR
+     - name: Push Docker image to Azure ACR  #Push Image to ACR
        run: |
-         docker push ${{ env.ACRREGISTRY }}/${{ env.ACRREPOSITORY }}:${{ env.BUILD_ID }}
+         docker push ${{ vars.REGISTRY_NAME }}.azurecr.io/${{ env.BU }}-${{ env.APPLICATION_NAME }}/${{ env.APPLICATION_ROLE }}:${{ env.BUILD_ID }}
        env:
-         ACRREGISTRY: ${{ env.ACRREGISTRY }}
-         ACRREPOSITORY: ${{ env.ACRREPOSITORY }}
          BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
