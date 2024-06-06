@@ -1,0 +1,32 @@
+nameOverride: allocationproxy-pilot
+replicaCount: 1
+namespace: ns-set-dev-allocationproxy
+serviceAccountName: id-set-dev-allocationproxy-pilot
+serviceAccountId: 7d3f5a28-a4bc-4d7f-8a5c-409dee86fdb1
+image: ACR_IMAGE
+pullPolicy: IfNotPresent
+containerPort: 8080
+resources: 
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}
+service:
+  port: 80
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
