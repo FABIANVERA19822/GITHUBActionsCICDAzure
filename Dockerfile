@@ -1,17 +1,15 @@
-# Usa la imagen oficial de .NET Core como base
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /app
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
+WORKDIR /App
 
-# Copia el archivo csproj y restaura las dependencias
-COPY src/ConsoleAppHelloWorld/ConsoleAppHelloWorld.csproj ./src/ConsoleAppHelloWorld/
-RUN dotnet restore ./src/ConsoleAppHelloWorld/ConsoleAppHelloWorld.csproj
+# Copy everything
+COPY ./src ./
+# Restore as distinct layers
+RUN dotnet restore
+# Build and publish a release
+RUN dotnet publish -c Release -o out
 
-# Copia todo el contenido y construye la aplicación
-COPY . .
-RUN dotnet publish -c Release -o out ./src/ConsoleAppHelloWorld/ConsoleAppHelloWorld.csproj
-
-# Genera una imagen ligera con el resultado de la compilación
-FROM mcr.microsoft.com/dotnet/runtime:8.0
-WORKDIR /app
-COPY --from=build /app/out .
-ENTRYPOINT ["dotnet", "ConsoleAppHelloWorld.dll"]
+# Build runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /App
+COPY --from=build-env /App/out .
+ENTRYPOINT ["dotnet", "src.dll"]
