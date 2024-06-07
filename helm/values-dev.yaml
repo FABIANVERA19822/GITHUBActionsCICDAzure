@@ -1,6 +1,6 @@
 nameOverride: allocationproxy-pilot
 replicaCount: 1
-namespace: ns-set-dev-allocationproxy
+namespace: ns-set-dev-aks-cicd
 serviceAccountName: id-set-dev-allocationproxy-pilot
 serviceAccountId: 7d3f5a28-a4bc-4d7f-8a5c-409dee86fdb1
 image: ACR_IMAGE
