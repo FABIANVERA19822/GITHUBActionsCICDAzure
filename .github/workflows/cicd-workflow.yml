@@ -93,11 +93,11 @@ jobs:
         env:
           BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
   
-  deploy:
+  deploy_using_helm:
     permissions:
       id-token: write
       contents: write
-    runs-on: internal
+    runs-on: ubuntu-latest
     needs: [build]
     environment: ${{ inputs.Environment }}
     steps:
@@ -136,7 +136,7 @@ jobs:
           TAG: ${{needs.build.outputs.image_tag}}
         run: |
           helm upgrade --install ${{env.APPLICATION_NAME}} oci://${{ vars.REGISTRY_NAME }}.azurecr.io/helm/app-template \
-          --namespace=ns-set-dev-allocationproxy \
+          --namespace=ns-set-dev-aks-cicd \
           --values helm/values-${{ inputs.Environment }}.yaml \
           --set image=${{ vars.REGISTRY_NAME }}.azurecr.io/ns-${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}:${{ env.TAG }} \
           --version 0.3.0 --debug --atomic
