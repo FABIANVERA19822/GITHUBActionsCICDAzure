@@ -4,7 +4,7 @@ environment: dev
 projectname: helloapp
 applicationrole: cicdaks
 replicaCount: 1
-namespace: ns-set-dev-allocationproxy
+namespace: ns-set-dev-aks-cicd
 managedIdentityClientId: f7366529-31c6-4ae6-b831-10cca3083b7c
 pullPolicy: IfNotPresent
 containerPort: 80
