@@ -119,8 +119,7 @@ jobs:
         env:
           TAG: ${{needs.build.outputs.image_tag}}
         run: |
-          helm upgrade --install ${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}-${{ inputs.AppId }} \
-            oci://${{ vars.REGISTRY_NAME }}.azurecr.io/helm/app-template \
+          helm upgrade --install ${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}-${{ inputs.AppId }} oci://${{ vars.REGISTRY_NAME }}.azurecr.io/helm/app-template \
             --namespace=ns-set-dev-aks-cicd \
             --values helm/values-${{ inputs.Environment }}.yaml \
             --set image=${{ vars.REGISTRY_NAME }}.azurecr.io/${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}:${{ env.TAG }} \
