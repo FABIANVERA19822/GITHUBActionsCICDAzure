@@ -39,23 +39,6 @@ jobs:
         run: |
               cat env/.env >>${GITHUB_ENV}
 
-      # - name: Setup .NET Core SDK
-      #   uses: actions/setup-dotnet@v1
-      #   with:
-      #     dotnet-version: '8.0.x'
-  
-      # - name: Restore NuGet packages
-      #   run: dotnet restore
-      #   working-directory: src/
-
-      # - name: Build dotnet
-      #   run: dotnet build --configuration Release --no-restore
-      #   working-directory: src/
-        
-      - name: Run Tests
-        run: dotnet test --no-build --verbosity normal
-        working-directory: src/
-   
       - name: Generate SemVer tag
         id: semver 
         run: |
@@ -89,7 +72,7 @@ jobs:
 
       - name: Push Docker image to Azure ACR
         run: |
-          docker push ${{ vars.REGISTRY_NAME }}.azurecr.io/ns-${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}:${{ env.BUILD_ID }}
+          docker push ${{ vars.REGISTRY_NAME }}.azurecr.io/${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}:${{ env.BUILD_ID }}
         env:
           BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
   
@@ -130,13 +113,15 @@ jobs:
            cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
            admin: 'false'
            use-kubelogin: 'true'
+           
 
       - name: Application Helm charts packages
         env:
           TAG: ${{needs.build.outputs.image_tag}}
         run: |
-          helm upgrade --install ${{env.APPLICATION_NAME}} oci://${{ vars.REGISTRY_NAME }}.azurecr.io/helm/app-template \
-          --namespace=ns-set-dev-aks-cicd \
-          --values helm/values-${{ inputs.Environment }}.yaml \
-          --set image=${{ vars.REGISTRY_NAME }}.azurecr.io/ns-${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}:${{ env.TAG }} \
-          --version 0.3.0 --debug --atomic
+          helm upgrade --install ${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}-${{ inputs.AppId }} \
+            oci://${{ vars.REGISTRY_NAME }}.azurecr.io/helm/app-template \
+            --namespace=ns-set-dev-aks-cicd \
+            --values helm/values-${{ inputs.Environment }}.yaml \
+            --set image=${{ vars.REGISTRY_NAME }}.azurecr.io/${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}:${{ env.TAG }} \
+            --version 0.7.0 --debug

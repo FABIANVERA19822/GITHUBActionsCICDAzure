@@ -1,32 +1,47 @@
-nameOverride: allocationproxy-pilot
+# Common env variables
+bu: set
+environment: dev
+projectname: helloapp
+applicationrole: cicdaks
 replicaCount: 1
-namespace: ns-set-dev-aks-cicd
-serviceAccountName: id-set-dev-allocationproxy-pilot
-serviceAccountId: 7d3f5a28-a4bc-4d7f-8a5c-409dee86fdb1
-image: ACR_IMAGE
+namespace: ns-set-dev-allocationproxy
+managedIdentityClientId: f7366529-31c6-4ae6-b831-10cca3083b7c
 pullPolicy: IfNotPresent
-containerPort: 8080
-resources: 
-  limits:
-    cpu: 200m
-    memory: 128Mi
-  requests:
-    cpu: 100m
-    memory: 64Mi
+containerPort: 80
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# POD Resource limits
+resources:
+  limits:
+    cpu: 850m
+    memory: 2Gi
+  requests:
+    cpu: 150m
+    memory: 1Gi
+
+# Service
 service:
   port: 80
+
+# Network Policy North-South:
+inboundPolicyNorthSouth:
+  enabled: false
+
+# Ingress
 ingress:
   enabled: false
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths: []
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
+
+
+# App Configuration
+appconfig:
+  enabled: false
+
+
+# Environment variables
+env:
+  - name: ASPNETCORE_ENVIRONMENT
+    value: Development
+  - name: ASPNETCORE_HTTP_PORTS
+    value: 80
