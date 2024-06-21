@@ -53,7 +53,7 @@ jobs:
             echo "::set-output name=BUILD_ID::${{ steps.semver.outputs.SEMVER }}-${ts}"
 
       - name: Build and tag Docker image
-        run: docker build -f Dockerfile --tag ${{ vars.REGISTRY_NAME }}.azurecr.io/ns-${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}:${{ env.BUILD_ID }} .
+        run: docker build -f Dockerfile --tag ${{ vars.REGISTRY_NAME }}.azurecr.io/${{env.BU}}-${{ inputs.Environment }}-${{env.APPLICATION_NAME}}-${{env.APPLICATION_ROLE}}:${{ env.BUILD_ID }} .
         env:
           BUILD_ID: ${{ steps.prep.outputs.BUILD_ID }}
 
